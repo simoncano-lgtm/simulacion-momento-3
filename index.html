@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulación de caudal - Momento 3</title>
+<style>
+  :root{
+    --blue:#1769aa;
+    --blue-light:#dceeff;
+    --green:#247a62;
+    --text:#17202a;
+    --muted:#5f6b76;
+    --border:#d7dde3;
+    --bg:#f5f7f9;
+    --white:#ffffff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Arial,Helvetica,sans-serif;
+    color:var(--text);
+    background:var(--bg);
+  }
+  .container{
+    max-width:1100px;
+    margin:0 auto;
+    padding:24px;
+  }
+  h1{margin:0 0 8px;font-size:28px}
+  h2{font-size:19px;margin:0 0 12px}
+  .subtitle{color:var(--muted);margin:0 0 20px}
+  .card{
+    background:var(--white);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:18px;
+    margin-bottom:18px;
+  }
+  .controls{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+  button{
+    border:1px solid var(--blue);
+    background:var(--white);
+    color:var(--blue);
+    border-radius:9px;
+    padding:11px 16px;
+    font-weight:700;
+    cursor:pointer;
+    min-height:44px;
+  }
+  button.active,button:hover{
+    background:var(--blue);
+    color:white;
+  }
+  .status{
+    padding:10px 12px;
+    background:var(--blue-light);
+    border-radius:8px;
+    font-size:14px;
+    color:#17496d;
+  }
+  .chart-wrap{
+    overflow-x:auto;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:#fff;
+  }
+  svg{display:block;width:100%;min-width:760px;height:auto}
+  .grid{stroke:#e7ebef;stroke-width:1}
+  .axis{stroke:#263238;stroke-width:1.5}
+  .segment{stroke:var(--green);stroke-width:4;fill:none;stroke-linejoin:round;stroke-linecap:round}
+  .area{fill:#8fc1e8;fill-opacity:.48}
+  .point{fill:#1769aa;stroke:#fff;stroke-width:2}
+  .point-label{font-size:14px;font-weight:700;fill:#155b91}
+  .tick{font-size:12px;fill:#4d5963}
+  .axis-label{font-size:14px;font-weight:700;fill:#263238}
+  .result-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:12px;
+  }
+  .result{
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:14px;
+    background:#fafbfc;
+  }
+  .result .label{font-size:13px;color:var(--muted);margin-bottom:6px}
+  .result .value{font-size:22px;font-weight:700}
+  .formula{
+    background:#f3f6f8;
+    border-left:4px solid var(--green);
+    padding:12px 14px;
+    border-radius:6px;
+    line-height:1.65;
+    margin-top:14px;
+    overflow-x:auto;
+  }
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px;border-bottom:1px solid var(--border);text-align:right}
+  th:first-child,td:first-child{text-align:center}
+  th{background:#f3f6f8}
+  .note{color:var(--muted);font-size:14px;line-height:1.55}
+  .verification{
+    background:#eef8f3;
+    border:1px solid #cce7da;
+    border-radius:10px;
+    padding:14px;
+    line-height:1.6;
+  }
+  @media(max-width:720px){
+    .container{padding:14px}
+    h1{font-size:23px}
+    .result-grid{grid-template-columns:1fr}
+    .card{padding:14px}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Simulación interactiva de caudal</h1>
+  <p class="subtitle">Momento 3 · Río Cauca · Estación La Virginia · Risaralda</p>
+
+  <div class="card">
+    <h2>1. Selección del intervalo</h2>
+    <div class="controls">
+      <button id="firstBtn" class="active" type="button">Primer intervalo</button>
+      <button id="fullBtn" type="button">Periodo completo</button>
+    </div>
+    <div id="status" class="status" aria-live="polite">
+      Mostrando el intervalo de 0 a 6 horas.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Gráfica de los seis datos</h2>
+    <div class="chart-wrap">
+      <svg id="chart" viewBox="0 0 1000 560" role="img"
+           aria-label="Gráfica de caudal contra tiempo con región sombreada">
+        <g id="grid"></g>
+        <g id="area"></g>
+        <g id="axes"></g>
+        <g id="segments"></g>
+        <g id="points"></g>
+        <g id="labels"></g>
+      </svg>
+    </div>
+    <p class="note">
+      Los seis registros originales se conservan y se unen mediante segmentos rectos.
+      El área sombreada representa el área bajo los segmentos seleccionados.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>3. Resultado automático</h2>
+    <div class="result-grid">
+      <div class="result">
+        <div class="label">Área bajo los segmentos</div>
+        <div class="value" id="areaResult">7.005,69</div>
+        <div class="note">m³·h/s</div>
+      </div>
+      <div class="result">
+        <div class="label">Factor de conversión</div>
+        <div class="value">3.600</div>
+        <div class="note">s/h</div>
+      </div>
+      <div class="result">
+        <div class="label">Volumen de agua</div>
+        <div class="value" id="volumeResult">25.220.484</div>
+        <div class="note">m³</div>
+      </div>
+    </div>
+
+    <div class="formula" id="formula">
+      V₁ = 3600 × ∫₀⁶ f(t) dt<br>
+      V₁ = 3600 × 7005,69<br>
+      <strong>V₁ = 25.220.484 m³</strong>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>4. Datos originales de la Tabla 1</h2>
+    <table>
+      <thead>
+        <tr><th>Tiempo t (h)</th><th>Caudal (m³/s)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0</td><td>1162,18</td></tr>
+        <tr><td>6</td><td>1173,05</td></tr>
+        <tr><td>12</td><td>1108,83</td></tr>
+        <tr><td>24</td><td>1213,33</td></tr>
+        <tr><td>30</td><td>1265,22</td></tr>
+        <tr><td>36</td><td>1228,10</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>5. Verificación</h2>
+    <div class="verification">
+      Los seis datos de la simulación coinciden con los registros de la Tabla 1.
+      Para el primer intervalo, de 0 a 6 horas, el área calculada es
+      <strong>7005,69</strong> y, al multiplicarla por 3600, se obtiene un volumen
+      de <strong>25.220.484 m³</strong>, coincidente con el cálculo de la integral
+      definida del Momento 2.
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const data = [
+    {t:0,  q:1162.18},
+    {t:6,  q:1173.05},
+    {t:12, q:1108.83},
+    {t:24, q:1213.33},
+    {t:30, q:1265.22},
+    {t:36, q:1228.10}
+  ];
+
+  const svg = document.getElementById("chart");
+  const grid = document.getElementById("grid");
+  const axes = document.getElementById("axes");
+  const area = document.getElementById("area");
+  const segments = document.getElementById("segments");
+  const points = document.getElementById("points");
+  const labels = document.getElementById("labels");
+  const areaResult = document.getElementById("areaResult");
+  const volumeResult = document.getElementById("volumeResult");
+  const formula = document.getElementById("formula");
+  const status = document.getElementById("status");
+  const firstBtn = document.getElementById("firstBtn");
+  const fullBtn = document.getElementById("fullBtn");
+
+  const W=1000, H=560;
+  const left=82, right=34, top=34, bottom=70;
+  const plotW=W-left-right, plotH=H-top-bottom;
+  const minX=0, maxX=36;
+  const minY=1050, maxY=1300;
+
+  function sx(x){ return left + ((x-minX)/(maxX-minX))*plotW; }
+  function sy(y){ return top + ((maxY-y)/(maxY-minY))*plotH; }
+
+  function fmt(n, decimals=2){
+    return new Intl.NumberFormat("es-CO", {
+      minimumFractionDigits:decimals,
+      maximumFractionDigits:decimals
+    }).format(n);
+  }
+
+  function svgEl(name, attrs){
+    const el=document.createElementNS("http://www.w3.org/2000/svg",name);
+    Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v));
+    return el;
+  }
+
+  function drawGrid(){
+    grid.innerHTML="";
+    for(let x=0;x<=36;x+=6){
+      const X=sx(x);
+      grid.appendChild(svgEl("line",{x1:X,y1:top,x2:X,y2:top+plotH,class:"grid"}));
+      const tx=svgEl("text",{x:X,y:H-bottom+28,"text-anchor":"middle",class:"tick"});
+      tx.textContent=x;
+      grid.appendChild(tx);
+    }
+    for(let y=1100;y<=1300;y+=50){
+      const Y=sy(y);
+      grid.appendChild(svgEl("line",{x1:left,y1:Y,x2:left+plotW,y2:Y,class:"grid"}));
+      const ty=svgEl("text",{x:left-12,y:Y+4,"text-anchor":"end",class:"tick"});
+      ty.textContent=y;
+      grid.appendChild(ty);
+    }
+  }
+
+  function drawAxes(){
+    axes.innerHTML="";
+    axes.appendChild(svgEl("line",{x1:left,y1:top+plotH,x2:left+plotW,y2:top+plotH,class:"axis"}));
+    axes.appendChild(svgEl("line",{x1:left,y1:top,x2:left,y2:top+plotH,class:"axis"}));
+
+    const xLabel=svgEl("text",{x:left+plotW/2,y:H-18,"text-anchor":"middle",class:"axis-label"});
+    xLabel.textContent="Tiempo transcurrido (horas)";
+    axes.appendChild(xLabel);
+
+    const yLabel=svgEl("text",{
+      x:18,y:top+plotH/2,
+      transform:`rotate(-90 18 ${top+plotH/2})`,
+      "text-anchor":"middle",class:"axis-label"
+    });
+    yLabel.textContent="Caudal (m³/s)";
+    axes.appendChild(yLabel);
+  }
+
+  function drawChart(mode){
+    area.innerHTML="";
+    segments.innerHTML="";
+    points.innerHTML="";
+    labels.innerHTML="";
+
+    const lastIndex = mode==="first" ? 1 : data.length-1;
+
+    // Sombreado bajo los segmentos seleccionados.
+    let path=`M ${sx(data[0].t)} ${sy(0)} `;
+    path += `L ${sx(data[0].t)} ${sy(data[0].q)} `;
+    for(let i=0;i<=lastIndex;i++){
+      path += `L ${sx(data[i].t)} ${sy(data[i].q)} `;
+    }
+    path += `L ${sx(data[lastIndex].t)} ${sy(0)} Z`;
+
+    area.appendChild(svgEl("path",{d:path,class:"area"}));
+
+    for(let i=0;i<data.length-1;i++){
+      const line=svgEl("line",{
+        x1:sx(data[i].t), y1:sy(data[i].q),
+        x2:sx(data[i+1].t), y2:sy(data[i+1].q),
+        class:"segment",
+        opacity:i<lastIndex ? "1" : (mode==="first" ? "0.35" : "1")
+      });
+      segments.appendChild(line);
+    }
+
+    data.forEach((p,i)=>{
+      const circle=svgEl("circle",{
+        cx:sx(p.t),cy:sy(p.q),r:i<=lastIndex?7:6,
+        class:"point",opacity:i<=lastIndex?"1":"0.75"
+      });
+      points.appendChild(circle);
+
+      const text=svgEl("text",{
+        x:sx(p.t),y:sy(p.q)-14,
+        "text-anchor":"middle",class:"point-label"
+      });
+      text.textContent=String.fromCharCode(65+i);
+      labels.appendChild(text);
+    });
+
+    calculate(mode);
+  }
+
+  function calculate(mode){
+    const end = mode==="first" ? 1 : data.length-1;
+    let areaTotal=0;
+
+    for(let i=0;i<end;i++){
+      const dt=data[i+1].t-data[i].t;
+      areaTotal += dt*(data[i].q+data[i+1].q)/2;
+    }
+
+    const volume=areaTotal*3600;
+    areaResult.textContent=fmt(areaTotal);
+    volumeResult.textContent=fmt(volume,0);
+
+    if(mode==="first"){
+      status.textContent="Mostrando el intervalo de 0 a 6 horas.";
+      formula.innerHTML =
+        "V₁ = 3600 × ∫₀⁶ f(t) dt<br>" +
+        "V₁ = 3600 × 7005,69<br>" +
+        "<strong>V₁ = 25.220.484 m³</strong>";
+    }else{
+      status.textContent="Mostrando el periodo completo: 0 a 36 horas y los cinco segmentos.";
+      formula.innerHTML =
+        "V = 3600 × [7005,69 + 6845,64 + 13932,96 + 7435,65 + 7479,96]<br>" +
+        "V = 3600 × 42699,90<br>" +
+        "<strong>V = 153.719.640 m³</strong>";
+    }
+  }
+
+  firstBtn.addEventListener("click",function(){
+    firstBtn.classList.add("active");
+    fullBtn.classList.remove("active");
+    drawChart("first");
+  });
+
+  fullBtn.addEventListener("click",function(){
+    fullBtn.classList.add("active");
+    firstBtn.classList.remove("active");
+    drawChart("full");
+  });
+
+  drawGrid();
+  drawAxes();
+  drawChart("first");
+})();
+</script>
+</body>
+</html>
